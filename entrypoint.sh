@@ -109,10 +109,8 @@ printf "Tip: Use files $DIR_CONF_TEMPLATES/*$SUFFIX_TEMPLATE to make the files i
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_TEMPLATES" "$DIR_CONF";
 
-printf "Starting rsyslog.\n";
+printf "Starting rsyslog in background.\n";
 $RSYSLOG_EXECUTABLE;
 
-printf "Starting postfix.\n";
-$POSTFIX_EXECUTABLE start;
-
-sleep infinity;
+printf "Starting postfix in foreground.\n";
+$POSTFIX_EXECUTABLE start-fg;
