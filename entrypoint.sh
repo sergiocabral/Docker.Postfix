@@ -41,6 +41,53 @@ IS_FIRST_CONFIGURATION=$((test ! -d $DIR_CONF_BACKUP && echo true) || echo false
 if [ $IS_FIRST_CONFIGURATION = true ];
 then
     printf "This is the FIRST RUN.\n";
+
+    printf "Running postfix for the first time.\n";
+
+    $POSTFIX_EXECUTABLE start;
+    sleep 1;
+    $POSTFIX_EXECUTABLE stop;
+    sleep 1;
+
+    printf "Configuring directories.\n";
+
+    mkdir -p $DIR_CONF_DOCKER;
+    cp -R $DIR_CONF $DIR_CONF_BACKUP;
+    cp -R $DIR_CONF/* $DIR_CONF_DOCKER/;
+    rm -R $DIR_CONF;
+    ln -s $DIR_CONF_DOCKER $DIR_CONF;
+
+    mkdir -p $DIR_CONF_TEMPLATES;
+
+    if [ -d "$DIR_CONF_TEMPLATES" ] && [ ! -z "$(ls -A $DIR_CONF_TEMPLATES)" ];
+    then
+        printf "Warning: The $DIR_CONF_TEMPLATES directory already existed and will not have its content overwritten.\n";
+    else
+        printf "Creating file templates in $DIR_CONF_TEMPLATES\n";
+
+        for FILE in $(ls -1 $DIR_CONF_DOCKER | grep -E "(\\.cf$|^[a-z]+$)");
+        do
+            FILE="$DIR_CONF_DOCKER/$FILE";
+            if [ ! -d $FILE ];
+            then
+                cp $FILE $DIR_CONF_TEMPLATES;
+            fi
+        done;
+
+        ls -1 $DIR_CONF_TEMPLATES | \
+           grep -v $SUFFIX_TEMPLATE | \
+           xargs -I {} mv $DIR_CONF_TEMPLATES/{} $DIR_CONF_TEMPLATES/{}$SUFFIX_TEMPLATE;
+    fi
+    $LS -Ad $DIR_CONF_TEMPLATES/*;
+
+    printf "Configured directories:\n";
+
+    USER=postfix;
+    chmod -R 755 $DIR_CONF_BACKUP       && chown -R $USER:$USER $DIR_CONF_BACKUP;
+    chmod -R 755 $DIR_CONF_TEMPLATES    && chown -R $USER:$USER $DIR_CONF_TEMPLATES;
+    chmod -R 755 $DIR_CONF_DOCKER       && chown -R $USER:$USER $DIR_CONF_DOCKER;
+    
+    $LS -d $DIR_CONF $DIR_CONF_BACKUP $DIR_CONF_TEMPLATES $DIR_CONF_DOCKER;
 else
     printf "This is NOT the first run.\n";
 fi
