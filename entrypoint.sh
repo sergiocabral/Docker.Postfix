@@ -22,6 +22,7 @@ printf "Entrypoint for docker image: postfix\n";
 POSTFIX_ARGS="$* $POSTFIX_ARGS";
 
 POSTFIX_EXECUTABLE=$(which postfix || echo "");
+RSYSLOG_EXECUTABLE=$(which rsyslogd || echo "");
 SUFFIX_TEMPLATE=".template";
 DIR_CONF="/etc/postfix";
 DIR_CONF_BACKUP="$DIR_CONF.original";
@@ -33,6 +34,12 @@ LS="ls --color=auto -CFl";
 if [ ! -e "$POSTFIX_EXECUTABLE" ];
 then
     printf "Postfix is not installed.\n" >> /dev/stderr;
+    exit 1;
+fi
+
+if [ ! -e "$RSYSLOG_EXECUTABLE" ];
+then
+    printf "Rsyslog is not installed.\n" >> /dev/stderr;
     exit 1;
 fi
 
@@ -82,14 +89,28 @@ then
 
     printf "Configured directories:\n";
 
-    USER=postfix;
+    USER=root;
     chmod -R 755 $DIR_CONF_BACKUP       && chown -R $USER:$USER $DIR_CONF_BACKUP;
     chmod -R 755 $DIR_CONF_TEMPLATES    && chown -R $USER:$USER $DIR_CONF_TEMPLATES;
     chmod -R 755 $DIR_CONF_DOCKER       && chown -R $USER:$USER $DIR_CONF_DOCKER;
     
     $LS -d $DIR_CONF $DIR_CONF_BACKUP $DIR_CONF_TEMPLATES $DIR_CONF_DOCKER;
+
+    FILE_RSYSLOG_CONF="/etc/rsyslog.conf";
+    cp $FILE_RSYSLOG_CONF "$FILE_RSYSLOG_CONF.original";
+    sed -i -e "/imklog/ s/^/#/" $FILE_RSYSLOG_CONF;
+    printf "Configured rsyslog at:\n";
+    $LS $FILE_RSYSLOG_CONF*;
 else
     printf "This is NOT the first run.\n";
 fi
+
+printf "Tip: Use files $DIR_CONF_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF directory with replacement of environment variables with their values.\n";
+
+printf "Starting rsyslog.\n";
+$RSYSLOG_EXECUTABLE;
+
+printf "Starting postfix.\n";
+$POSTFIX_EXECUTABLE start;
 
 sleep infinity;
