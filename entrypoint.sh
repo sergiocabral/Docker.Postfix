@@ -112,34 +112,42 @@ $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_TEMPLATES" "$DIR_CO
 
 SENDER_ACCESS_FILE="$DIR_CONF/sender_access";
 touch $SENDER_ACCESS_FILE;
-printf "Updating access level file by sender.\n";
-readarray -t SENDER_ACCESS_LIST < <($DIR_SCRIPTS/split-to-lines.sh " " "$SENDER_ACCESS");
 SENDER_ACCESS_INDEX=0;
-for SENDER_ACCESS_ENTRY in "${SENDER_ACCESS_LIST[@]}";
-do
-    SENDER_ACCESS_INDEX=$((SENDER_ACCESS_INDEX + 1));
+function register_sender_access {
+    local MODE=$1;
+    local LIST=$2;
 
-    readarray -t SENDER_ACCESS_ENTRY < <($DIR_SCRIPTS/split-to-lines.sh "=" "$SENDER_ACCESS_ENTRY");
-    SENDER_ACCESS_MODE=${SENDER_ACCESS_ENTRY[0]};
-    SENDER_ACCESS_DOMAIN=${SENDER_ACCESS_ENTRY[1]};
-
-    SENDER_ACCESS_EXISTS=$(\
-        cat $SENDER_ACCESS_FILE |\
-        grep "$SENDER_ACCESS_DOMAIN" |\
-        grep "$SENDER_ACCESS_MODE" ||\
-        echo "");
-
-    PADDING=$( test $SENDER_ACCESS_INDEX -lt 10 && echo "  " || ( test $SENDER_ACCESS_INDEX -lt 100 && echo " " || echo "" ) );
-    printf "$PADDING$SENDER_ACCESS_INDEX: ";
-    if [ -n "$SENDER_ACCESS_EXISTS" ];
+    if [ -n "$LIST" ];
     then
-        printf "[READY] ";
-    else
-        echo "$SENDER_ACCESS_DOMAIN $SENDER_ACCESS_MODE" >> $SENDER_ACCESS_FILE;
-        printf "[ADDED] ";
+        readarray -t LIST < <($DIR_SCRIPTS/split-to-lines.sh " " "$LIST");
+        for DOMAIN in "${LIST[@]}";
+        do
+            SENDER_ACCESS_INDEX=$((SENDER_ACCESS_INDEX + 1));
+
+            local EXISTS=$(\
+                cat $SENDER_ACCESS_FILE |\
+                grep "$DOMAIN" |\
+                grep "$MODE" ||\
+                echo "");
+
+            printf "%5s" "$SENDER_ACCESS_INDEX: ";
+            if [ -n "$EXISTS" ];
+            then
+                printf "[READY] ";
+            else
+                echo "$DOMAIN $MODE" >> $SENDER_ACCESS_FILE;
+                printf "[ADDED] ";
+            fi
+            printf "Access: ";
+            printf "%-7s" "$MODE";
+            printf "Domain: $DOMAIN\n";        
+        done
     fi
-    printf "Access: $SENDER_ACCESS_MODE Domain: $SENDER_ACCESS_DOMAIN\n";
-done
+}
+
+printf "Updating access level file by sender.\n";
+register_sender_access "ALLOW" "$SENDER_ACCESS_ALLOW";
+register_sender_access "REJECT" "$SENDER_ACCESS_REJECT";
 $POSTMAP_EXECUTABLE "$SENDER_ACCESS_FILE";
 printf "Updated files:\n";
 $LS $SENDER_ACCESS_FILE*
