@@ -144,6 +144,42 @@ $POSTMAP_EXECUTABLE "$SENDER_ACCESS_FILE";
 printf "Updated files:\n";
 $LS $SENDER_ACCESS_FILE*
 
+SASL_PASSWORD_FILE="$DIR_CONF/sasl_password";
+if [ -n "$RELAY_HOST" ];
+then
+    printf "Updating relay host password file.\n";
+    readarray -t RELAY_HOST < <($DIR_SCRIPTS/split-to-lines.sh ":" "$RELAY_HOST");
+
+    if [ ${#RELAY_HOST[@]} != 2 ];
+    then
+        printf "Expected environment variable RELAY_HOST with format <hostname>:<port>\n";
+        RELAY_HOST[0]="";
+        RELAY_HOST[1]="";
+    else
+        printf "\n";
+        printf "    Hostname = ${RELAY_HOST[0]}\n";
+        printf "        Port = ${RELAY_HOST[1]}\n";
+        if [ -n "$RELAY_HOST_AUTH" ];
+        then
+            readarray -t RELAY_HOST_AUTH < <($DIR_SCRIPTS/split-to-lines.sh "=" "$RELAY_HOST_AUTH");
+            printf "    Username = ${RELAY_HOST_AUTH[0]}\n";
+            printf "    Password = ***\n";
+            RELAY_HOST_AUTH="${RELAY_HOST_AUTH[0]}:${RELAY_HOST_AUTH[1]}";
+        fi
+        printf "\n";
+    fi
+fi
+if [ -n "$RELAY_HOST" ];
+then
+    echo "[${RELAY_HOST[0]}]:${RELAY_HOST[1]} $RELAY_HOST_AUTH" | xargs > $SASL_PASSWORD_FILE;
+else
+    printf "No data for relay host password file.\n";
+    echo "" > $SASL_PASSWORD_FILE;
+fi
+$POSTMAP_EXECUTABLE "$SASL_PASSWORD_FILE";
+printf "Updated files:\n";
+$LS $SASL_PASSWORD_FILE*
+
 printf "Starting rsyslog in background.\n";
 $RSYSLOG_EXECUTABLE;
 
