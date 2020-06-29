@@ -22,6 +22,7 @@ printf "Entrypoint for docker image: postfix\n";
 POSTFIX_ARGS="$* $POSTFIX_ARGS";
 
 POSTFIX_EXECUTABLE=$(which postfix || echo "");
+POSTMAP_EXECUTABLE=$(which postmap || echo "");
 RSYSLOG_EXECUTABLE=$(which rsyslogd || echo "");
 SUFFIX_TEMPLATE=".template";
 DIR_CONF="/etc/postfix";
@@ -31,7 +32,7 @@ DIR_CONF_DOCKER="$DIR_CONF.conf";
 DIR_SCRIPTS="${DIR_SCRIPTS:-/root}";
 LS="ls --color=auto -CFl";
 
-if [ ! -e "$POSTFIX_EXECUTABLE" ];
+if [ ! -e "$POSTFIX_EXECUTABLE" ] || [ ! -e "$POSTMAP_EXECUTABLE" ];
 then
     printf "Postfix is not installed.\n" >> /dev/stderr;
     exit 1;
@@ -90,9 +91,9 @@ then
     printf "Configured directories:\n";
 
     USER=root;
-    chmod -R 755 $DIR_CONF_BACKUP       && chown -R $USER:$USER $DIR_CONF_BACKUP;
-    chmod -R 755 $DIR_CONF_TEMPLATES    && chown -R $USER:$USER $DIR_CONF_TEMPLATES;
-    chmod -R 755 $DIR_CONF_DOCKER       && chown -R $USER:$USER $DIR_CONF_DOCKER;
+    chown -R $USER:$USER $DIR_CONF_BACKUP;
+    chown -R $USER:$USER $DIR_CONF_TEMPLATES;
+    chown -R $USER:$USER $DIR_CONF_DOCKER;
     
     $LS -d $DIR_CONF $DIR_CONF_BACKUP $DIR_CONF_TEMPLATES $DIR_CONF_DOCKER;
 
@@ -108,6 +109,40 @@ fi
 printf "Tip: Use files $DIR_CONF_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF directory with replacement of environment variables with their values.\n";
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_TEMPLATES" "$DIR_CONF";
+
+SENDER_ACCESS_FILE="$DIR_CONF/sender_access";
+touch $SENDER_ACCESS_FILE;
+printf "Updating access level file by sender.\n";
+readarray -t SENDER_ACCESS_LIST < <($DIR_SCRIPTS/split-to-lines.sh " " "$SENDER_ACCESS");
+SENDER_ACCESS_INDEX=0;
+for SENDER_ACCESS_ENTRY in "${SENDER_ACCESS_LIST[@]}";
+do
+    SENDER_ACCESS_INDEX=$((SENDER_ACCESS_INDEX + 1));
+
+    readarray -t SENDER_ACCESS_ENTRY < <($DIR_SCRIPTS/split-to-lines.sh "=" "$SENDER_ACCESS_ENTRY");
+    SENDER_ACCESS_MODE=${SENDER_ACCESS_ENTRY[0]};
+    SENDER_ACCESS_DOMAIN=${SENDER_ACCESS_ENTRY[1]};
+
+    SENDER_ACCESS_EXISTS=$(\
+        cat $SENDER_ACCESS_FILE |\
+        grep "$SENDER_ACCESS_DOMAIN" |\
+        grep "$SENDER_ACCESS_MODE" ||\
+        echo "");
+
+    PADDING=$( test $SENDER_ACCESS_INDEX -lt 10 && echo "  " || ( test $SENDER_ACCESS_INDEX -lt 100 && echo " " || echo "" ) );
+    printf "$PADDING$SENDER_ACCESS_INDEX: ";
+    if [ -n "$SENDER_ACCESS_EXISTS" ];
+    then
+        printf "[READY] ";
+    else
+        echo "$SENDER_ACCESS_DOMAIN $SENDER_ACCESS_MODE" >> $SENDER_ACCESS_FILE;
+        printf "[ADDED] ";
+    fi
+    printf "Access: $SENDER_ACCESS_MODE Domain: $SENDER_ACCESS_DOMAIN\n";
+done
+$POSTMAP_EXECUTABLE "$SENDER_ACCESS_FILE";
+printf "Updated files:\n";
+$LS $SENDER_ACCESS_FILE*
 
 printf "Starting rsyslog in background.\n";
 $RSYSLOG_EXECUTABLE;

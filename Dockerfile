@@ -3,7 +3,6 @@ FROM alpine:latest
 RUN apk add --no-cache \
 	bash \
 	gettext \
-	apache2-utils \
 	rsyslog \
 	postfix
 
