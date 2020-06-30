@@ -44,6 +44,8 @@ then
     exit 1;
 fi
 
+##########
+
 IS_FIRST_CONFIGURATION=$((test ! -d $DIR_CONF_BACKUP && echo true) || echo false);
 
 if [ $IS_FIRST_CONFIGURATION = true ];
@@ -110,6 +112,8 @@ printf "Tip: Use files $DIR_CONF_TEMPLATES/*$SUFFIX_TEMPLATE to make the files i
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_TEMPLATES" "$DIR_CONF";
 
+##########
+
 SENDER_ACCESS_FILE="$DIR_CONF/sender_access";
 touch $SENDER_ACCESS_FILE;
 SENDER_ACCESS_INDEX=0;
@@ -151,6 +155,8 @@ register_sender_access "REJECT" "$SENDER_ACCESS_REJECT";
 $POSTMAP_EXECUTABLE "$SENDER_ACCESS_FILE";
 printf "Updated files:\n";
 $LS $SENDER_ACCESS_FILE*
+
+##########
 
 SASL_PASSWORD_FILE="$DIR_CONF/sasl_password";
 if [ -n "$SMTP_EXTERNAL" ];
@@ -194,6 +200,8 @@ fi
 $POSTMAP_EXECUTABLE "$SASL_PASSWORD_FILE";
 printf "Updated files:\n";
 $LS $SASL_PASSWORD_FILE*
+
+##########
 
 printf "Updating email redirects.\n";
 VIRTUAL_FILE_TEMP="/tmp/virtual";
@@ -250,15 +258,25 @@ $POSTMAP_EXECUTABLE "$VIRTUAL_FILE";
 printf "Updated files:\n";
 $LS $VIRTUAL_FILE*
 
+##########
+
 FILE_CONF="$DIR_CONF/main.cf";
 FILE_CONF_TEMP="/tmp/main.cf";
 truncate -s 0 $FILE_CONF_TEMP;
 
 printf "Editing file settings.\n";
+
 if [ -n "$BANNER" ];
 then
     sed -i -e "/^\s*smtpd_banner/ s/^/#/" $FILE_CONF;
     echo "smtpd_banner = $BANNER" >> $FILE_CONF_TEMP;
+fi
+
+if [ -n "$DOMAINS" ];
+then
+    readarray -t DOMAINS < <($DIR_SCRIPTS/split-to-lines.sh " " "$DOMAINS");
+    sed -i -e "/^\s*virtual_alias_domains/ s/^/#/" $FILE_CONF;
+    echo "virtual_alias_domains = ${DOMAINS[@]:0}" >> $FILE_CONF_TEMP;
 fi
 
 if [ -n "$(cat $FILE_CONF_TEMP)" ];
@@ -279,6 +297,8 @@ fi
 rm $FILE_CONF_TEMP;
 printf "Updated files:\n";
 $LS $FILE_CONF*
+
+##########
 
 printf "Starting rsyslog in background.\n";
 $RSYSLOG_EXECUTABLE;
