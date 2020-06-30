@@ -109,6 +109,7 @@ fi
 printf "Tip: Use files $DIR_CONF_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF directory with replacement of environment variables with their values.\n";
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_TEMPLATES" "$DIR_CONF";
+
 SENDER_ACCESS_FILE="$DIR_CONF/sender_access";
 touch $SENDER_ACCESS_FILE;
 SENDER_ACCESS_INDEX=0;
@@ -125,8 +126,8 @@ function register_sender_access {
 
             local EXISTS=$(\
                 cat $SENDER_ACCESS_FILE |\
-                grep "$DOMAIN" |\
-                grep "$MODE" ||\
+                grep "^$DOMAIN " |\
+                grep " $MODE$" ||\
                 echo "");
 
             printf "%5s" "$SENDER_ACCESS_INDEX: ";
