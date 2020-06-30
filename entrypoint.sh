@@ -153,33 +153,40 @@ printf "Updated files:\n";
 $LS $SENDER_ACCESS_FILE*
 
 SASL_PASSWORD_FILE="$DIR_CONF/sasl_password";
-if [ -n "$RELAY_HOST" ];
+if [ -n "$SMTP_EXTERNAL" ];
 then
     printf "Updating relay host password file.\n";
-    readarray -t RELAY_HOST < <($DIR_SCRIPTS/split-to-lines.sh ":" "$RELAY_HOST");
+    readarray -t SMTP_EXTERNAL < <($DIR_SCRIPTS/split-to-lines.sh " " "$SMTP_EXTERNAL");
 
-    if [ ${#RELAY_HOST[@]} != 2 ];
+    SMTP_EXTERNAL_SERVER="${SMTP_EXTERNAL[0]}";
+    SMTP_EXTERNAL_AUTH="${SMTP_EXTERNAL[@]:1}";
+
+    readarray -t SMTP_EXTERNAL_SERVER < <($DIR_SCRIPTS/split-to-lines.sh ":" "$SMTP_EXTERNAL_SERVER");
+
+    if [ ${#SMTP_EXTERNAL_SERVER[@]} != 2 ];
     then
-        printf "Expected environment variable RELAY_HOST with format <hostname>:<port>\n";
-        RELAY_HOST[0]="";
-        RELAY_HOST[1]="";
+        printf "Expected environment variable SMTP_EXTERNAL with format <hostname>:<port> [username]=[password]\n";
+        SMTP_EXTERNAL_SERVER="";
     else
         printf "\n";
-        printf "    Hostname = ${RELAY_HOST[0]}\n";
-        printf "        Port = ${RELAY_HOST[1]}\n";
-        if [ -n "$RELAY_HOST_AUTH" ];
+        printf "    Hostname = ${SMTP_EXTERNAL_SERVER[0]}\n";
+        printf "        Port = ${SMTP_EXTERNAL_SERVER[1]}\n";
+        if [ -n "$SMTP_EXTERNAL_AUTH" ];
         then
-            readarray -t RELAY_HOST_AUTH < <($DIR_SCRIPTS/split-to-lines.sh "=" "$RELAY_HOST_AUTH");
-            printf "    Username = ${RELAY_HOST_AUTH[0]}\n";
+            readarray -t SMTP_EXTERNAL_AUTH_USER < <($DIR_SCRIPTS/split-to-lines.sh "=" "$SMTP_EXTERNAL_AUTH");
+            SMTP_EXTERNAL_AUTH_USER=${SMTP_EXTERNAL_AUTH_USER[0]};
+            SMTP_EXTERNAL_AUTH_USER_LENGTH=$((${#SMTP_EXTERNAL_AUTH_USER} + 1));
+            SMTP_EXTERNAL_AUTH_PASS="${SMTP_EXTERNAL_AUTH:$SMTP_EXTERNAL_AUTH_USER_LENGTH}";
+            printf "    Username = ${SMTP_EXTERNAL_AUTH_USER}\n";
             printf "    Password = ***\n";
-            RELAY_HOST_AUTH="${RELAY_HOST_AUTH[0]}:${RELAY_HOST_AUTH[1]}";
+            SMTP_EXTERNAL_AUTH="${SMTP_EXTERNAL_AUTH_USER}:${SMTP_EXTERNAL_AUTH_PASS}";
         fi
         printf "\n";
     fi
 fi
-if [ -n "$RELAY_HOST" ];
+if [ -n "$SMTP_EXTERNAL_SERVER" ];
 then
-    echo "[${RELAY_HOST[0]}]:${RELAY_HOST[1]} $RELAY_HOST_AUTH" | xargs > $SASL_PASSWORD_FILE;
+    echo "[${SMTP_EXTERNAL_SERVER[0]}]:${SMTP_EXTERNAL_SERVER[1]} $SMTP_EXTERNAL_AUTH" | xargs > $SASL_PASSWORD_FILE;
 else
     printf "No data for relay host password file.\n";
     echo "" > $SASL_PASSWORD_FILE;
