@@ -109,7 +109,6 @@ fi
 printf "Tip: Use files $DIR_CONF_TEMPLATES/*$SUFFIX_TEMPLATE to make the files in the $DIR_CONF directory with replacement of environment variables with their values.\n";
 
 $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_TEMPLATES" "$DIR_CONF";
-
 SENDER_ACCESS_FILE="$DIR_CONF/sender_access";
 touch $SENDER_ACCESS_FILE;
 SENDER_ACCESS_INDEX=0;
@@ -135,7 +134,7 @@ function register_sender_access {
             then
                 printf "[READY] ";
             else
-                echo "$DOMAIN $MODE" >> $SENDER_ACCESS_FILE;
+                printf "%-60s $MODE\n" "$DOMAIN" >> $SENDER_ACCESS_FILE;
                 printf "[ADDED] ";
             fi
             printf "Access: ";
@@ -194,6 +193,61 @@ fi
 $POSTMAP_EXECUTABLE "$SASL_PASSWORD_FILE";
 printf "Updated files:\n";
 $LS $SASL_PASSWORD_FILE*
+
+printf "Updating email redirects.\n";
+VIRTUAL_FILE_TEMP="/tmp/virtual";
+truncate -s 0 $VIRTUAL_FILE_TEMP;
+VIRTUAL_FILE="$DIR_CONF/virtual";
+EMAIL_REDIRECT_INDEX=1;
+while [ -n "$(VAR_NAME="EMAIL_REDIRECT${EMAIL_REDIRECT_INDEX}"; echo "${!VAR_NAME}")" ];
+do
+    VAR_NAME="EMAIL_REDIRECT${EMAIL_REDIRECT_INDEX}";
+    EMAIL_REDIRECT=${!VAR_NAME};
+    readarray -t EMAIL_REDIRECT < <($DIR_SCRIPTS/split-to-lines.sh "=" "$EMAIL_REDIRECT");
+    EMAIL_REDIRECT_FROM=${EMAIL_REDIRECT[0]};
+    EMAIL_REDIRECT_TO=${EMAIL_REDIRECT[1]};
+
+    if [ -n "$EMAIL_REDIRECT_TO" ];
+    then
+        readarray -t EMAIL_REDIRECT_TO < <($DIR_SCRIPTS/split-to-lines.sh " " "$EMAIL_REDIRECT_TO");
+    fi
+
+    printf "%3s: Redirect from: $EMAIL_REDIRECT_FROM\n" "$EMAIL_REDIRECT_INDEX";
+    if [ -n "${EMAIL_REDIRECT_TO[0]}" ];
+    then
+        printf "%-40s" "$EMAIL_REDIRECT_FROM" >> $VIRTUAL_FILE_TEMP;
+        FIRST=true;
+        for TO in ${EMAIL_REDIRECT_TO[@]};
+        do
+            printf "                to: $TO\n";
+            if [ "$FIRST" = false ];
+            then
+                printf "," >> $VIRTUAL_FILE_TEMP;
+            fi
+            printf " $TO" >> $VIRTUAL_FILE_TEMP;
+            FIRST=false;
+        done;
+        printf "\n" >> $VIRTUAL_FILE_TEMP;
+    else
+        printf "     No destination email found. Redirection ignored.\n";
+    fi
+
+    EMAIL_REDIRECT_INDEX=$((EMAIL_REDIRECT_INDEX + 1));
+done
+
+if [ -z "$(cat $VIRTUAL_FILE_TEMP)" ];
+then
+    printf "No email redirection were found on the environment variables.\n";
+    printf "Using the file the way it is.\n";
+else
+    printf "Recreating file with email redirects.\n";
+    cp $VIRTUAL_FILE_TEMP $VIRTUAL_FILE;
+fi
+rm $VIRTUAL_FILE_TEMP;
+
+$POSTMAP_EXECUTABLE "$VIRTUAL_FILE";
+printf "Updated files:\n";
+$LS $VIRTUAL_FILE*
 
 printf "Starting rsyslog in background.\n";
 $RSYSLOG_EXECUTABLE;
