@@ -250,6 +250,36 @@ $POSTMAP_EXECUTABLE "$VIRTUAL_FILE";
 printf "Updated files:\n";
 $LS $VIRTUAL_FILE*
 
+FILE_CONF="$DIR_CONF/main.cf";
+FILE_CONF_TEMP="/tmp/main.cf";
+truncate -s 0 $FILE_CONF_TEMP;
+
+printf "Editing file settings.\n";
+if [ -n "$BANNER" ];
+then
+    sed -i -e "/^\s*smtpd_banner/ s/^/#/" $FILE_CONF;
+    echo "smtpd_banner = $BANNER" >> $FILE_CONF_TEMP;
+fi
+
+if [ -n "$(cat $FILE_CONF_TEMP)" ];
+then
+    echo "" >> $FILE_CONF;
+    echo "# The settings below have been added based on environment variables." >> $FILE_CONF;
+    cat $FILE_CONF_TEMP >> $FILE_CONF;
+
+    printf "The settings below were written to the file.\n";
+    printf "\n";
+    cat $FILE_CONF_TEMP | \
+    xargs -I {} echo "   " {};
+    printf "\n";
+else
+    printf "No configuration was written to the file.\n";
+fi
+
+rm $FILE_CONF_TEMP;
+printf "Updated files:\n";
+$LS $FILE_CONF*
+
 printf "Starting rsyslog in background.\n";
 $RSYSLOG_EXECUTABLE;
 
