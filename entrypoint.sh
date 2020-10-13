@@ -114,44 +114,35 @@ $DIR_SCRIPTS/envsubst-files.sh "$SUFFIX_TEMPLATE" "$DIR_CONF_TEMPLATES" "$DIR_CO
 
 ##########
 
-SENDER_ACCESS_FILE="$DIR_CONF/sender_access";
-touch $SENDER_ACCESS_FILE;
-SENDER_ACCESS_INDEX=0;
-function register_sender_access {
-    local MODE=$1;
-    local LIST=$2;
-
-    if [ -n "$LIST" ];
-    then
-        readarray -t LIST < <($DIR_SCRIPTS/split-to-lines.sh " " "$LIST");
-        for DOMAIN in "${LIST[@]}";
-        do
-            SENDER_ACCESS_INDEX=$((SENDER_ACCESS_INDEX + 1));
-
-            local EXISTS=$(\
-                cat $SENDER_ACCESS_FILE |\
-                grep "^$DOMAIN " |\
-                grep " $MODE$" ||\
-                echo "");
-
-            printf "%5s" "$SENDER_ACCESS_INDEX: ";
-            if [ -n "$EXISTS" ];
-            then
-                printf "[READY] ";
-            else
-                printf "%-60s $MODE\n" "$DOMAIN" >> $SENDER_ACCESS_FILE;
-                printf "[ADDED] ";
-            fi
-            printf "Access: ";
-            printf "%-7s" "$MODE";
-            printf "Domain: $DOMAIN\n";        
-        done
-    fi
-}
-
 printf "Updating access level file by sender.\n";
-register_sender_access "ALLOW" "$SENDER_ACCESS_ALLOW";
-register_sender_access "REJECT" "$SENDER_ACCESS_REJECT";
+SENDER_ACCESS_FILE="$DIR_CONF/sender_access";
+SENDER_ACCESS_FILE_TEMP="/tmp/sender_access";
+truncate -s 0 $SENDER_ACCESS_FILE_TEMP;
+SENDER_ACCESS_INDEX=1;
+while [ -n "$(VAR_NAME="SENDER_ACCESS${SENDER_ACCESS_INDEX}"; echo "${!VAR_NAME}")" ];
+do
+    VAR_NAME="SENDER_ACCESS${SENDER_ACCESS_INDEX}";
+    SENDER_ACCESS=${!VAR_NAME};
+
+    if [ -n "$SENDER_ACCESS" ];
+    then
+        printf "%3s: $SENDER_ACCESS\n" "$SENDER_ACCESS_INDEX";
+        printf "$SENDER_ACCESS\n" >> $SENDER_ACCESS_FILE_TEMP;
+    fi
+
+    SENDER_ACCESS_INDEX=$((SENDER_ACCESS_INDEX + 1));
+done
+
+if [ -z "$(cat $SENDER_ACCESS_FILE_TEMP)" ];
+then
+    printf "No sender access were found on the environment variables.\n";
+    printf "Using the file the way it is.\n";
+else
+    printf "Recreating file with sender access.\n";
+    cp $SENDER_ACCESS_FILE_TEMP $SENDER_ACCESS_FILE;
+fi
+rm $SENDER_ACCESS_FILE_TEMP;
+
 $POSTMAP_EXECUTABLE "$SENDER_ACCESS_FILE";
 printf "Updated files:\n";
 $LS $SENDER_ACCESS_FILE*
