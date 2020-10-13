@@ -263,11 +263,29 @@ then
     echo "smtpd_banner = $BANNER" >> $FILE_CONF_TEMP;
 fi
 
-if [ -n "$DOMAINS" ];
+DOMAIN_WRITTEN=false;
+DOMAIN_INDEX=1;
+while [ -n "$(VAR_NAME="DOMAIN${DOMAIN_INDEX}"; echo "${!VAR_NAME}")" ];
+do
+    VAR_NAME="DOMAIN${DOMAIN_INDEX}";
+    DOMAIN=${!VAR_NAME};
+
+    if [ -n "$DOMAIN" ];
+    then
+        if [ $DOMAIN_WRITTEN = false ];
+        then
+            sed -i -e "/^\s*virtual_alias_domains/ s/^/#/" $FILE_CONF;
+            printf "virtual_alias_domains =" >> $FILE_CONF_TEMP;
+            DOMAIN_WRITTEN=true;
+        fi
+        printf " $DOMAIN" >> $FILE_CONF_TEMP;
+    fi
+
+    DOMAIN_INDEX=$((DOMAIN_INDEX + 1));
+done
+if [ $DOMAIN_WRITTEN = true ];
 then
-    readarray -t DOMAINS < <($DIR_SCRIPTS/split-to-lines.sh " " "$DOMAINS");
-    sed -i -e "/^\s*virtual_alias_domains/ s/^/#/" $FILE_CONF;
-    echo "virtual_alias_domains = ${DOMAINS[@]:0}" >> $FILE_CONF_TEMP;
+    printf "\n" >> $FILE_CONF_TEMP;
 fi
 
 if [ -n "$(cat $FILE_CONF_TEMP)" ];
